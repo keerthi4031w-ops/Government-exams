@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Government exam tracker</title>
+<style>
+:root{--bg:#f3f6f4;--card:#fff;--tx:#14231f;--mut:#5a6b66;--bd:#d9e1dd;--ac:#0f6b4f;--okb:#d9f1e6;--ok:#0b5a41;--snb:#fdebc8;--sn:#7a4a00;--clb:#e8ebea;--cl:#55605c}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1715;--card:#18221f;--tx:#e8efec;--mut:#9fb0aa;--bd:#2a3833;--ac:#5fd0a5;--okb:#17382b;--ok:#7be0b6;--snb:#3a2d10;--sn:#f1c872;--clb:#25302c;--cl:#a6b3ae}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:780px;margin:0 auto;padding:24px 16px 56px}
+h1{font:600 1.9rem/1.2 Georgia,"Times New Roman",serif;margin:0 0 6px}
+h2{font:600 1.25rem Georgia,serif;margin:30px 0 2px}
+.muted{color:var(--mut);font-size:.9rem}
+.tabs{display:flex;gap:8px;margin:16px 0 4px;flex-wrap:wrap}
+.tabs button{border:1px solid var(--bd);background:var(--card);color:var(--tx);padding:6px 14px;border-radius:99px;font:inherit;font-size:.9rem;cursor:pointer}
+.tabs button[aria-pressed=true]{background:var(--ac);color:var(--bg);border-color:var(--ac)}
+button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+details{background:var(--card);border:1px solid var(--bd);border-radius:10px;margin:10px 0}
+summary{cursor:pointer;padding:12px 14px;list-style:none;display:flex;justify-content:space-between;gap:12px}
+summary::-webkit-details-marker{display:none}
+.t{font-weight:600}.d{font-size:.9rem;margin-top:2px}
+.tags{display:flex;flex-direction:column;gap:4px;align-items:flex-end}
+.tag{font-size:.78rem;font-weight:600;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.open,.good{background:var(--okb);color:var(--ok)}.soon,.possible{background:var(--snb);color:var(--sn)}.closed,.not_suitable{background:var(--clb);color:var(--cl)}
+.body{padding:2px 14px 14px;border-top:1px solid var(--bd);font-size:.93rem}
+.body h3{font-size:.85rem;font-weight:600;color:var(--mut);margin:12px 0 0}
+.body p{margin:2px 0 0}
+a.btn{display:inline-block;margin-top:14px;background:var(--ac);color:var(--bg);padding:8px 14px;border-radius:8px;text-decoration:none;font-weight:600;font-size:.9rem}
+.empty{padding:28px 0}
+</style>
+</head>
+<body>
+<main>
+<h1>Government exam tracker</h1>
+<p class="muted" id="meta">Loading the latest exams...</p>
+<div class="tabs" id="tabs"></div>
+<div id="list"></div>
+</main>
+<script>
+const TABS=[["All",()=>true],["Tamil Nadu",e=>e.category==="Tamil Nadu"],["Central",e=>e.category!=="Tamil Nadu"],["Suits me",e=>e.fit==="good"]];
+const LABEL={good:"Good fit",possible:"Possible",not_suitable:"Not suitable"};
+let exams=[],tab=0;
+const today=new Date();today.setHours(0,0,0,0);
+const day=s=>s?new Date(s+"T00:00:00"):null;
+function status(e){const s=day(e.apply_start_iso),f=day(e.apply_end_iso);
+ if(f&&f<today)return"closed";if(s&&s>today)return"soon";if(s||f)return"open";return"soon"}
+function daysLeft(e){const f=day(e.apply_end_iso);if(!f)return"";const d=Math.round((f-today)/864e5);return d===0?"closes today":d+" days left"}
+const el=(t,c,x)=>{const n=document.createElement(t);if(c)n.className=c;if(x!==undefined)n.textContent=x;return n};
+function field(parent,label,value){if(!value||value==="Not announced")return;parent.append(el("h3","",label),el("p","",value))}
+function card(e,st){
+ const d=el("details"),s=el("summary"),l=el("div"),tags=el("div","tags");
+ l.append(el("div","t",e.name),el("div","muted",e.body),el("div","d","Apply: "+(e.apply_start||"not announced")+" to "+(e.apply_end||"not announced")));
+ tags.append(el("span","tag "+st,st==="open"?(daysLeft(e)||"Open"):st==="soon"?"Opening soon":"Closed"),el("span","tag "+e.fit,LABEL[e.fit]));
+ s.append(l,tags);
+ const b=el("div","body");
+ field(b,"Does it suit you?",e.fit_reason);field(b,"Other dates",e.other_dates);field(b,"Exam date",e.exam_date);
+ field(b,"About the exam",e.about);field(b,"Eligibility",e.eligibility);field(b,"Application fee",e.fee);
+ field(b,"Syllabus",e.syllabus);field(b,"What happens after you clear it",e.selection_rounds);field(b,"Salary if selected",e.salary);
+ if(/^https?:\/\//.test(e.official_link)){const a=el("a","btn","Official site");a.href=e.official_link;a.target="_blank";a.rel="noopener noreferrer";b.append(a)}
+ d.append(s,b);return d}
+function render(){
+ const box=document.getElementById("list");box.replaceChildren();
+ const rows=exams.filter(TABS[tab][1]).map(e=>[e,status(e)]);
+ const groups=[["open","Applications open now"],["soon","Opening soon"],["closed","Recently closed"]];
+ let any=false;
+ for(const [k,h] of groups){const r=rows.filter(x=>x[1]===k);if(!r.length)continue;any=true;
+  if(k==="open")r.sort((a,b)=>(a[0].apply_end_iso||"9").localeCompare(b[0].apply_end_iso||"9"));
+  box.append(el("h2","",h));r.forEach(x=>box.append(card(x[0],k)))}
+ if(!any)box.append(el("p","empty muted","No exams in this view."))}
+function tabs(){const t=document.getElementById("tabs");t.replaceChildren();
+ TABS.forEach((x,i)=>{const b=el("button","",x[0]);b.setAttribute("aria-pressed",i===tab);b.onclick=()=>{tab=i;tabs();render()};t.append(b)})}
+fetch("exams.json",{cache:"no-store"}).then(r=>{if(!r.ok)throw 0;return r.json()}).then(j=>{
+ exams=j.exams||[];
+ document.getElementById("meta").textContent="Updated "+j.updated+". Always confirm dates on the official site before applying.";
+ tabs();render()}).catch(()=>{
+ document.getElementById("meta").textContent="exams.json was not found. Run the Update exams workflow once (see README), then reload."});
+</script>
+</body>
+</html>
